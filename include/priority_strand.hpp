@@ -283,7 +283,6 @@ public:
         BOOST_ASIO_HANDLER_CREATION(
                 (impl->service_->context(), *p.p, "priority_strand_executor", impl.get(), 0, "defer"));
 
-
         bool first = enqueue(impl, p.p, prioritized);
         p.v = p.p = 0;
 
@@ -418,7 +417,7 @@ private:
                 }
             }
         }
-
+        
     private:
         implementation_type impl_;
         executor_work_guard<Executor> work_;
@@ -571,7 +570,7 @@ public:
         ret.prioritized_ = true;
         return ret;
     }
-
+  
     auto normal_priority() const noexcept -> priority_strand
     {
         auto ret = *this;

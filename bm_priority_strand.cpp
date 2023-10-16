@@ -62,7 +62,7 @@ void bm_priority_strand(benchmark::State& state)
             boost::asio::post(priorityStrand, [&strand_count]{++strand_count;});
             boost::asio::post(priorityStrand.high_priority(), [&strand_count]{++strand_count;});
         }
-
+      
         while(async_count.load()!=10 || async_count.load()!=20);
 
         timer.cancel();
