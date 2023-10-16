@@ -148,7 +148,6 @@ public:
             impl->shutdown_ = true;
             ops.push(impl->queue_);
             ops.push(impl->priority_queue_);
-            impl->mutex_.unlock();
         }
     }
 
@@ -227,22 +226,21 @@ public:
         BOOST_ASIO_HANDLER_CREATION(
                 (impl->service_->context(), *p.p, "priority_strand_executor", impl.get(), 0, "dispatch"));
 
-        bool first = enqueue(impl, p.p, true);
+        bool first = enqueue(impl, p.p, prioritized);
         p.v = p.p = 0;
 
         if (first)
         {
-            // Simplify so not using allocator binder
             boost::asio::dispatch(
                     ex, allocator_binder<invoker<Executor>, Allocator>
-                                                            (invoker<Executor>(impl, ex), a));
+                        (invoker<Executor>(impl, ex), a));
         }
 
     }
 
     template <typename Executor, typename Function, typename Allocator>
     static void post(const implementation_type& impl, Executor& ex, Function&& function,
-                     Allocator a)
+                     Allocator a, bool prioritized)
     {
         using function_type = std::decay_t<Function>;
 
@@ -256,7 +254,7 @@ public:
         BOOST_ASIO_HANDLER_CREATION(
                 (impl->service_->context(), *p.p, "priority_strand_executor", impl.get(), 0, "post"));
 
-        bool first = enqueue(impl, p.p, true);
+        bool first = enqueue(impl, p.p, prioritized);
         p.v = p.p = 0;
 
         if (first)
@@ -270,7 +268,7 @@ public:
 
     template <typename Executor, typename Function, typename Allocator>
     static void defer(const implementation_type& impl, Executor& ex, Function&& function,
-                      Allocator a)
+                      Allocator a, bool prioritized)
     {
 
         using function_type = std::decay_t<Function>;
@@ -285,8 +283,7 @@ public:
         BOOST_ASIO_HANDLER_CREATION(
                 (impl->service_->context(), *p.p, "priority_strand_executor", impl.get(), 0, "defer"));
 
-
-        bool first = enqueue(impl, p.p, true);
+        bool first = enqueue(impl, p.p, prioritized);
         p.v = p.p = 0;
 
         if (first)
@@ -371,8 +368,8 @@ private:
                 if (more_handlers)
                 {
                     Executor ex(this_->work_.get_executor());
-                    recycling_allocator<void> allocator;
-                    ex.post(static_cast<invoker&&>(*this_), allocator);
+                    detail::recycling_allocator<void> allocator;
+                    ex.post(std::move(*this_), allocator);
                 }
             }
 
@@ -400,8 +397,8 @@ private:
                 {
                     impl_->priority_queue_.pop();
                     ++impl_->priority_total_out_;
-                    o->complete(impl_.get(), ec, 0);
                     lock.unlock();
+                    o->complete(impl_.get(), ec, 0);
                     ++work_count;
                     continue;
                 }
@@ -412,15 +409,16 @@ private:
                 {
                     impl_->queue_.pop();
                     ++impl_->total_out_;
-                    o->complete(impl_.get(), ec, 0);
                     lock.unlock();
+                    o->complete(impl_.get(), ec, 0);
                     ++work_count;
                 } else {
                     empty = true;
                 }
             }
         }
-
+        
+    private:
         implementation_type impl_;
         executor_work_guard<Executor> work_;
     };
@@ -516,21 +514,24 @@ public:
     void dispatch(Function&& function, const Allocator& allocator) const noexcept
     {
         detail::priority_strand_executor_service::dispatch(impl_, executor_,
-                                                           std::forward<Function>(function), allocator);
+                                                           std::forward<Function>(function), allocator,
+                                                           prioritized_);
     }
 
     template <typename Function, typename Allocator>
     void post(Function&& function, const Allocator& allocator) const noexcept
     {
         detail::priority_strand_executor_service::post(impl_, executor_,
-                                                           std::forward<Function>(function), allocator);
+                                                           std::forward<Function>(function), allocator,
+                                                           prioritized_);
     }
 
     template <typename Function, typename Allocator>
     void defer(Function&& function, const Allocator& allocator) const noexcept
     {
         detail::priority_strand_executor_service::defer(impl_, executor_,
-                                                       std::forward<Function>(function), allocator);
+                                                       std::forward<Function>(function), allocator,
+                                                       prioritized_);
     }
 
     auto get_inner_executor() const noexcept ->inner_executor_type
@@ -563,14 +564,14 @@ public:
         return detail::priority_strand_executor_service::priority_out(impl_);
     }
 
-    auto high_priority() -> priority_strand
+    auto high_priority() const noexcept -> priority_strand
     {
         auto ret = *this;
         ret.prioritized_ = true;
         return ret;
     }
-
-    auto normal_priority() -> priority_strand
+  
+    auto normal_priority() const noexcept -> priority_strand
     {
         auto ret = *this;
         ret.prioritized_ = false;
