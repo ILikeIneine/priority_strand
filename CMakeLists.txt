@@ -14,14 +14,11 @@ if (!Boost_FOUND)
 endif ()
 
 option(${PROJECT_NAME}_ENABLE_BENCHMARKING "Enable benchmarking" ON)
-
-find_package(benchmark REQUIRED)
-
 if(${PROJECT_NAME}_ENABLE_BENCHMARKING)
     find_package(benchmark QUIET REQUIRED)
 
     add_executable(benchmark_${PROJECT_NAME} bm_priority_strand.cpp )
 
-    target_link_libraries(benchmark_${PROJECT_NAME} benchmark::benchmark ${PROJECT_NAME})
+    target_link_libraries(benchmark_${PROJECT_NAME} PRIVATE benchmark::benchmark ${PROJECT_NAME})
     set_target_properties(benchmark_${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)
 endif()

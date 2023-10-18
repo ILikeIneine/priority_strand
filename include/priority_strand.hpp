@@ -55,13 +55,12 @@ private:
             std::this_thread::sleep_for(std::chrono::nanoseconds(500'000));
         }
 
-#if defined(__i386__) || defined(__x86_64__) || defined(__arm64__)
+#if defined(__i386__) || defined(__x86_64__)
+#define SUPPORT_SPINLOCK 1
         static inline void pause() noexcept
         {
             asm volatile("pause");
         }
-#else
-#error "please implement system provided `pause`"
 #endif
         BOOST_CONSTEXPR static uint32_t MAX_SPIN_ROUND = 4000;
         uint32_t spin_count_;
@@ -82,7 +81,7 @@ public:
 
     ~priority_strand_executor_service()
     {
-        assert(not impl_list_.empty());
+        assert(impl_list_.empty());
         for(auto impl : impl_list_)
         {
             impl->service_ = nullptr;
@@ -112,7 +111,11 @@ public:
         friend priority_strand_executor_service;
 
         // Mutex for internal resource access
+#ifdef SUPPORT_SPINLOCK
         spin_lock mutex_;
+#else
+        std::mutex mutex_;
+#endif
 
         //
         bool locked_{false};
