@@ -55,20 +55,20 @@ void bm_priority_strand(benchmark::State& state)
     {
         std::atomic<size_t> async_count{};
         std::atomic<size_t> strand_count{};
+        std::atomic<size_t> priority_strand_count{};
 
         for(size_t i = 0; i < 10; i++)
         {
             boost::asio::post(io_context, [&async_count]{++async_count;});
             boost::asio::post(priorityStrand, [&strand_count]{++strand_count;});
-            boost::asio::post(priorityStrand.high_priority(), [&strand_count]{++strand_count;});
+            boost::asio::post(priorityStrand.high_priority(), [&priority_strand_count]{++priority_strand_count;});
         }
       
-        while(async_count.load()!=10 || async_count.load()!=20);
-
-        timer.cancel();
-        t1.join();
-        t2.join();
+        while(async_count!=10 || async_count!=10 || priority_strand_count!=10);
     }
+    timer.cancel();
+    t1.join();
+    t2.join();
 }
 
 BENCHMARK(bm_asio_strand);
